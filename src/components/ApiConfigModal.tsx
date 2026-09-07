@@ -260,6 +260,18 @@ export function ApiConfigModal({
             </div>
           </div>
 
+          {provider === 'gigachat' && (
+            <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs text-amber-900 space-y-1">
+              <p className="font-semibold flex items-center gap-1.5">
+                <span>ℹ️</span>
+                <span>Для GitHub Pages (статический сайт):</span>
+              </p>
+              <p className="text-[11px] leading-relaxed text-amber-800">
+                На GitHub Pages шлюз Сбера блокирует прямые браузерные запросы (CORS). В этом случае тренажёр автоматически включает умный симулятор ответов ролей. Для реальных сетевых запросов на GitHub Pages используйте вкладку «OpenAI REST API» с ключом OpenRouter или Groq.
+              </p>
+            </div>
+          )}
+
           {/* Instruction on hardcoding in code */}
           <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-1.5">
             <p className="font-semibold text-slate-900 flex items-center gap-1.5">

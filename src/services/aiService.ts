@@ -20,6 +20,13 @@ async function safeExtractError(response: Response, defaultMessage = 'Ошибк
     if (!rawText || !rawText.trim()) {
       return `${defaultMessage} (${response.status}: ${response.statusText || 'Без описания'})`;
     }
+    // Handle HTML pages returned by static web servers like GitHub Pages Nginx
+    if (rawText.includes('<html') || rawText.includes('405 Not Allowed') || rawText.startsWith('<!DOCTYPE')) {
+      if (response.status === 405 || response.status === 404) {
+        return `Статический хостинг (GitHub Pages) не имеет серверного бэкенда для обработки POST-запросов (код ${response.status}).`;
+      }
+      return `${defaultMessage} (${response.status} ${response.statusText || ''})`;
+    }
     try {
       const json = JSON.parse(rawText);
       return (
@@ -30,7 +37,7 @@ async function safeExtractError(response: Response, defaultMessage = 'Ошибк
         rawText
       );
     } catch {
-      return rawText;
+      return rawText.slice(0, 300);
     }
   } catch {
     return `${defaultMessage} (${response.status})`;
@@ -142,13 +149,21 @@ async function fetchGigaChat(
     if (proxyResponse.ok) {
       const data = await proxyResponse.json();
       if (data.reply) return data.reply;
-    } else if (proxyResponse.status !== 404) {
+    } else if (proxyResponse.status === 404 || proxyResponse.status === 405) {
+      // Static hosting detected (GitHub Pages returns 405 for POST /api/* or 404 for missing route)
+      // Continue to client-side fallback below
+    } else {
       const errText = await safeExtractError(proxyResponse, 'Ошибка сервера');
       throw new Error(errText || `Ошибка сервера (${proxyResponse.status})`);
     }
   } catch (proxyError: any) {
-    // If it was a real GigaChat error from our server (not 404 / connection error), throw it directly
-    if (proxyError.message && !proxyError.message.includes('404') && !proxyError.message.includes('Failed to fetch')) {
+    // If it was a real GigaChat error from our server (not 404 / 405 / connection error), throw it directly
+    if (
+      proxyError.message &&
+      !proxyError.message.includes('404') &&
+      !proxyError.message.includes('405') &&
+      !proxyError.message.includes('Failed to fetch')
+    ) {
       throw proxyError;
     }
   }
@@ -209,10 +224,12 @@ async function fetchGigaChatClientSide(
           oauthErr.name === 'TypeError' ||
           (oauthErr.message && (oauthErr.message.includes('fetch') || oauthErr.message.includes('NetworkError')))
         ) {
-          throw new Error(
-            'Браузер заблокировал прямой запрос к шлюзу Сбера (CORS / сертификат Минцифры). ' +
-            'Сервер https://ngw.devices.sberbank.ru:9443 блокирует прямые браузерные OPTIONS-запросы без прокси. ' +
-            'В нашем веб-приложении прокси уже настроен на сервере! Если вы открыли автономный index.html на GitHub Pages, используйте OpenRouter / Groq / OpenAI (вкладка «OpenAI-совместимый API»), которые поддерживают работу в браузере без бэкенда.'
+          // On static hosting like GitHub Pages, Sberbank's servers block browser cross-origin requests.
+          // Gracefully fallback to the built-in scenario simulation engine so the classroom experience continues seamlessly!
+          const simulated = generateSimulatedResponse(systemPrompt, messages);
+          return (
+            simulated +
+            '\n\n*(ℹ️ Режим симулятора: статический хостинг GitHub Pages блокирует прямые запросы к GigaChat из-за CORS и сертификатов Сбера. Чтобы подключить реальную модель на GitHub Pages, выберите OpenRouter во вкладке «Ключ API»)*'
           );
         }
         throw oauthErr;
@@ -262,8 +279,10 @@ async function fetchGigaChatClientSide(
       error.name === 'TypeError' ||
       (error.message && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')))
     ) {
-      throw new Error(
-        'Сетевая ошибка при обращении к GigaChat (CORS браузера). Пожалуйста, убедитесь, что сервер запущен.'
+      const simulated = generateSimulatedResponse(systemPrompt, messages);
+      return (
+        simulated +
+        '\n\n*(ℹ️ Режим симулятора: статический хостинг GitHub Pages блокирует прямые запросы к GigaChat из-за CORS и сертификатов Сбера. Чтобы подключить реальную модель на GitHub Pages, выберите OpenRouter во вкладке «Ключ API»)*'
       );
     }
     throw error;

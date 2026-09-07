@@ -738,15 +738,59 @@ export function getStandaloneHtmlContent(): string {
       try {
         const raw = await res.text();
         if (!raw) return defaultMsg + ' (' + res.status + ')';
+        if (raw.includes('<html') || raw.includes('405 Not Allowed') || raw.startsWith('<!DOCTYPE')) {
+          if (res.status === 405 || res.status === 404) {
+            return 'Статический хостинг (GitHub Pages) не имеет серверного бэкенда для POST-запросов (код ' + res.status + ').';
+          }
+          return defaultMsg + ' (' + res.status + ')';
+        }
         try {
           const parsed = JSON.parse(raw);
           return parsed.error?.message || parsed.message || parsed.error || parsed.error_description || raw;
         } catch {
-          return raw;
+          return raw.slice(0, 300);
         }
       } catch {
         return defaultMsg + ' (' + res.status + ')';
       }
+    }
+
+    function generateSimulatedResponse(sysPrompt, allMessages) {
+      const lastMsg = (allMessages[allMessages.length - 1]?.content || '').toLowerCase();
+      const pLower = (sysPrompt || '').toLowerCase();
+
+      const isAlchemist = pLower.includes('элдон') || pLower.includes('алхимик') || pLower.includes('зель');
+      const isConsultant = pLower.includes('консультант') || pLower.includes('иннотех') || pLower.includes('вуз');
+      const isGuide = pLower.includes('гид') || pLower.includes('феликс') || pLower.includes('экскурсовод');
+      const isTutor = pLower.includes('репетитор') || pLower.includes('физик') || pLower.includes('ньютон');
+
+      if (lastMsg.includes('забудь') || lastMsg.includes('злой') || lastMsg.includes('игнорируй')) {
+        return 'Я строго следую системным правилам и своей роли! Чем могу помочь вам в рамках текущей задачи?';
+      }
+
+      if (isAlchemist) {
+        if (lastMsg.includes('паук') || lastMsg.includes('яд') || lastMsg.includes('укус')) {
+          return '*Снимает с полки склянку с бирюзовой жидкостью*\\n\\n«О, яд пещерного паука — дело нешуточное! Прими Противоядие лунной лилии, пока не онемели пальцы. С тебя три серебряных монеты!»';
+        }
+        return '*Бросает щепотку светящейся пыльцы в котёл*\\n\\n«Приветствую тебя в лавке зелий, странник! Я, мастер Элдон, ведаю тайнами стихий. Что привело тебя ко мне: эликсир силы или целебный сбор?»';
+      }
+
+      if (isConsultant) {
+        if (lastMsg.includes('без егэ') || lastMsg.includes('гарант')) {
+          return '100% гарантии без экзаменов не бывает, но у нас есть олимпиады РСОШ, дающие право поступления БВИ, и целевые квоты IT-компаний!';
+        }
+        return 'Здравствуйте! Рада приветствовать вас в приёмной комиссии IT-университета «ИнноТех»! Какие направления вас интересуют?';
+      }
+
+      if (isGuide) {
+        return 'Привет, дорогой исследователь! Я Феликс — твой персональный гид по секретным местам города. Куда направимся: в тайные дворы или старую булочную?';
+      }
+
+      if (isTutor) {
+        return 'Привет! Я твой наставник по физике. Помни: второй закон Ньютона связывает силу, массу и ускорение (F = m · a). Давай разберём формулу!';
+      }
+
+      return 'Здравствуйте! Я действую в соответствии с заданной ролью по вашему системному промпту. Ваш запрос: «' + (allMessages[allMessages.length - 1]?.content || '') + '». Готов продолжать диалог!';
     }
 
     async function fetchOpenAIDirect(sysPrompt, allMessages) {
@@ -846,30 +890,36 @@ export function getStandaloneHtmlContent(): string {
         if (proxyRes.ok) {
           const pData = await proxyRes.json();
           if (pData.reply) return pData.reply;
-        } else if (proxyRes.status !== 404) {
+        } else if (proxyRes.status !== 404 && proxyRes.status !== 405) {
           const pErr = await safeExtractErr(proxyRes, 'Ошибка GigaChat API');
           throw new Error(pErr);
         }
       } catch (proxyErr) {
-        if (proxyErr.message && !proxyErr.message.includes('404') && !proxyErr.message.includes('fetch') && !proxyErr.message.includes('NetworkError')) {
+        if (
+          proxyErr.message &&
+          !proxyErr.message.includes('404') &&
+          !proxyErr.message.includes('405') &&
+          !proxyErr.message.includes('fetch') &&
+          !proxyErr.message.includes('NetworkError')
+        ) {
           throw proxyErr;
         }
       }
 
-      // 2. Прямое обращение (OAuth + API)
-      const token = await getGigaChatAccessToken(apiConfig.apiKey.trim());
-
-      const url = apiConfig.baseUrl.trim() || 'https://gigachat.devices.sberbank.ru/api/v1/chat/completions';
-      const payload = {
-        model: apiConfig.model.trim() || 'GigaChat',
-        messages: [
-          { role: 'system', content: sysPrompt },
-          ...allMessages.map(m => ({ role: m.role, content: m.content }))
-        ],
-        temperature: 0.7
-      };
-
+      // 2. Прямое обращение (OAuth + API) с перехватом ограничений статического хостинга
       try {
+        const token = await getGigaChatAccessToken(apiConfig.apiKey.trim());
+
+        const url = apiConfig.baseUrl.trim() || 'https://gigachat.devices.sberbank.ru/api/v1/chat/completions';
+        const payload = {
+          model: apiConfig.model.trim() || 'GigaChat',
+          messages: [
+            { role: 'system', content: sysPrompt },
+            ...allMessages.map(m => ({ role: m.role, content: m.content }))
+          ],
+          temperature: 0.7
+        };
+
         const res = await fetch(url, {
           method: 'POST',
           headers: {
@@ -889,10 +939,9 @@ export function getStandaloneHtmlContent(): string {
         if (!reply) throw new Error('Пустой ответ от GigaChat');
         return reply;
       } catch (err) {
-        if (err.name === 'TypeError' || (err.message && (err.message.includes('fetch') || err.message.includes('NetworkError')))) {
-          throw new Error(
-            'Браузер заблокировал обращение к GigaChat (CORS). Сервер Сбера не поддерживает прямые вызовы из браузера на сторонних доменах.'
-          );
+        if (err.name === 'TypeError' || (err.message && (err.message.includes('fetch') || err.message.includes('NetworkError') || err.message.includes('CORS')))) {
+          const sim = generateSimulatedResponse(sysPrompt, allMessages);
+          return sim + '\\n\\n*(ℹ️ Режим симулятора: статический хостинг GitHub Pages блокирует прямые браузерные запросы к GigaChat из-за CORS и сертификатов Сбера. Чтобы подключить реальную модель на GitHub Pages, выберите вкладку «OpenAI-совместимый API» с ключом OpenRouter/Groq)*';
         }
         throw err;
       }
