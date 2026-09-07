@@ -5,6 +5,7 @@ export interface ApiSettings {
   apiKey: string;
   baseUrl: string;
   model: string;
+  backendUrl?: string;
 }
 
 export interface ChatMessage {

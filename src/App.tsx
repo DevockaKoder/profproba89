@@ -12,6 +12,7 @@ import {
   DEFAULT_BASE_URL,
   DEFAULT_MODEL,
   DEFAULT_PROVIDER,
+  DEFAULT_BACKEND_URL,
 } from './config/apiKeyConfig';
 
 export default function App() {
@@ -30,6 +31,9 @@ export default function App() {
             parsed.baseUrl = DEFAULT_BASE_URL;
           }
         }
+        if (DEFAULT_BACKEND_URL && !parsed.backendUrl) {
+          parsed.backendUrl = DEFAULT_BACKEND_URL;
+        }
         return parsed;
       }
     } catch (e) {
@@ -40,6 +44,7 @@ export default function App() {
       apiKey: DEFAULT_API_KEY,
       baseUrl: DEFAULT_BASE_URL,
       model: DEFAULT_MODEL,
+      backendUrl: DEFAULT_BACKEND_URL,
     };
   });
 

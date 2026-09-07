@@ -3,6 +3,7 @@ import {
   DEFAULT_BASE_URL,
   DEFAULT_MODEL,
   DEFAULT_PROVIDER,
+  DEFAULT_BACKEND_URL,
 } from '../config/apiKeyConfig';
 
 export function getStandaloneHtmlContent(): string {
@@ -323,6 +324,7 @@ export function getStandaloneHtmlContent(): string {
     const DEFAULT_BASE_URL = '${DEFAULT_BASE_URL}'; // Шлюз API
     const DEFAULT_MODEL = '${DEFAULT_MODEL}'; // Имя модели нейросети
     const DEFAULT_PROVIDER = '${DEFAULT_PROVIDER}'; // 'openai' или 'gigachat'
+    const DEFAULT_BACKEND_URL = '${DEFAULT_BACKEND_URL}'; // URL бэкенда (для GitHub Pages)
     // ============================================================================
 
     // --- 1. Scenarios Data ---
@@ -426,7 +428,8 @@ export function getStandaloneHtmlContent(): string {
       provider: localStorage.getItem('pt_provider') || DEFAULT_PROVIDER,
       apiKey: localStorage.getItem('pt_api_key') || DEFAULT_API_KEY,
       baseUrl: localStorage.getItem('pt_base_url') || DEFAULT_BASE_URL,
-      model: localStorage.getItem('pt_model') || DEFAULT_MODEL
+      model: localStorage.getItem('pt_model') || DEFAULT_MODEL,
+      backendUrl: localStorage.getItem('pt_backend_url') || DEFAULT_BACKEND_URL
     };
 
     // --- 3. DOM Elements ---
@@ -875,9 +878,12 @@ export function getStandaloneHtmlContent(): string {
     }
 
     async function fetchGigaChatDirect(sysPrompt, allMessages) {
-      // 1. Попытка через локальный сервер-прокси /api/gigachat (если доступен на этом сервере)
+      // 1. Попытка через бэкенд-прокси /api/gigachat (локальный или удалённый)
+      const backendBase = (apiConfig.backendUrl || '').trim().replace(/\/+$/, '');
+      const proxyEndpoint = backendBase ? backendBase + '/api/gigachat' : '/api/gigachat';
+
       try {
-        const proxyRes = await fetch('/api/gigachat', {
+        const proxyRes = await fetch(proxyEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

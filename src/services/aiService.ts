@@ -129,10 +129,12 @@ async function fetchGigaChat(
   messages: ChatMessage[]
 ): Promise<string> {
   const cleanKey = settings.apiKey.trim();
+  const backendBase = (settings.backendUrl || '').trim().replace(/\/+$/, '');
+  const proxyEndpoint = backendBase ? `${backendBase}/api/gigachat` : '/api/gigachat';
 
   // Try the server-side GigaChat OAuth proxy first (handles Sber TLS certificates and CORS)
   try {
-    const proxyResponse = await fetch('/api/gigachat', {
+    const proxyResponse = await fetch(proxyEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

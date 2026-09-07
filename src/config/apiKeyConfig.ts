@@ -23,3 +23,8 @@ export const DEFAULT_MODEL = 'GigaChat';
 
 // Тип провайдера: 'openai' (любой OpenAI-совместимый API) или 'gigachat'
 export const DEFAULT_PROVIDER: 'openai' | 'gigachat' = 'gigachat';
+
+// URL бэкенд-сервера (если сайт размещён на GitHub Pages).
+// Если сайт запущен локально или на Vercel/Render, оставьте пустым '' (будет использоваться относительный путь /api/gigachat).
+export const DEFAULT_BACKEND_URL = '';
+
