@@ -179,8 +179,21 @@ export function getStandaloneHtmlContent(): string {
             <option value="game">⚔️ Персонаж игры (Мастер-алхимик Элдон из фэнтези RPG)</option>
             <option value="physics">⚛️ Школьный репетитор по физике (Ньютон-2.0)</option>
             <option value="detective">🕵️ Кибердетектив 2085 года (Майор Ковач)</option>
-            <option value="custom">✨ Свой собственный персонаж (Чистый шаблон)</option>
+            <option value="custom">✨ Свой уникальный персонаж (Чистый шаблон)</option>
           </select>
+        </div>
+
+        <!-- Custom Bot Name Input (when custom character scenario is selected) -->
+        <div id="custom-bot-name-container" class="hidden mt-3 p-3.5 bg-gradient-to-br from-purple-50 to-indigo-50/60 border border-purple-200 rounded-xl shadow-2xs space-y-2">
+          <div class="flex items-center justify-between">
+            <label for="custom-bot-name-input" class="text-xs font-bold text-purple-950 flex items-center gap-1.5">
+              <span>✨ Название вашего бота (имя персонажа):</span>
+            </label>
+          </div>
+          <input id="custom-bot-name-input" type="text" placeholder="Например: Шеф-повар Марио, Космический пилот..." class="w-full px-3 py-2 text-xs font-semibold bg-white border border-purple-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 shadow-2xs" />
+          <p class="text-[11px] text-purple-700 leading-snug">
+            💡 Это название будет отображаться в заголовке диалога («Роль: ...»), в репликах бота и в итоговом отчёте.
+          </p>
         </div>
 
         <!-- Mission Goal Banner -->
@@ -405,7 +418,7 @@ export function getStandaloneHtmlContent(): string {
         systemPrompt: \`Ты — майор Ковач, следователь Кибернетического Бюро Безопасности 2085 года.\\n\\nСпециализация:\\n- Обучать граждан кибергигиене (сложные пароли, защита от фишинга, 2FA).\\n- Стиль: собранный, немного нуарный, профессиональный.\\n\\nОграничения:\\n- Запрещено учить вредоносному взлому. Объясняй разницу между киберпреступниками и белыми этичными хакерами.\`
       },
       custom: {
-        title: 'Свой персонаж',
+        title: 'Свой уникальный персонаж',
         goal: 'Сформулируй свою собственную роль по формуле: Роль + Контекст + Цель + Ограничения + Формат.',
         prompts: [
           'Представься и расскажи о своих правилах!',
@@ -434,11 +447,21 @@ export function getStandaloneHtmlContent(): string {
 
     // --- 3. DOM Elements ---
     const scenarioSelect = document.getElementById('scenario-select');
+    const customBotNameContainer = document.getElementById('custom-bot-name-container');
+    const customBotNameInput = document.getElementById('custom-bot-name-input');
     const scenarioGoalText = document.getElementById('scenario-goal-text');
     const systemPromptInput = document.getElementById('system-prompt-input');
     const promptStats = document.getElementById('prompt-stats');
     const btnApplyPrompt = document.getElementById('btn-apply-prompt');
     const btnCopyPrompt = document.getElementById('btn-copy-prompt');
+
+    function getEffectiveRoleTitle() {
+      if (currentScenarioKey === 'custom') {
+        const val = (customBotNameInput ? customBotNameInput.value : '').trim();
+        return val || 'Свой уникальный персонаж';
+      }
+      return SCENARIOS[currentScenarioKey] ? SCENARIOS[currentScenarioKey].title : 'Ассистент';
+    }
 
     const chatRoleSubtitle = document.getElementById('chat-role-subtitle');
     const msgCountBadge = document.getElementById('msg-count-badge');
@@ -488,6 +511,20 @@ export function getStandaloneHtmlContent(): string {
         localStorage.setItem('pt_student_name', e.target.value);
       });
 
+      // Load custom bot name
+      const savedBotName = localStorage.getItem('pt_custom_bot_name');
+      if (savedBotName && customBotNameInput) customBotNameInput.value = savedBotName;
+
+      if (customBotNameInput) {
+        customBotNameInput.addEventListener('input', (e) => {
+          localStorage.setItem('pt_custom_bot_name', e.target.value);
+          if (currentScenarioKey === 'custom') {
+            chatRoleSubtitle.textContent = 'Роль: ' + getEffectiveRoleTitle();
+            renderMessages();
+          }
+        });
+      }
+
       renderMessages();
       startTimerLogic();
     }
@@ -507,7 +544,14 @@ export function getStandaloneHtmlContent(): string {
       const sc = SCENARIOS[key] || SCENARIOS.university;
       scenarioGoalText.textContent = sc.goal;
       systemPromptInput.value = sc.systemPrompt;
-      chatRoleSubtitle.textContent = 'Роль: ' + sc.title;
+
+      if (key === 'custom') {
+        if (customBotNameContainer) customBotNameContainer.classList.remove('hidden');
+      } else {
+        if (customBotNameContainer) customBotNameContainer.classList.add('hidden');
+      }
+
+      chatRoleSubtitle.textContent = 'Роль: ' + getEffectiveRoleTitle();
       updatePromptEvaluation();
 
       // Render tests chips
@@ -628,7 +672,7 @@ export function getStandaloneHtmlContent(): string {
 
         const nowTime = m.timestamp;
         const studentName = (studentNameInput.value.trim() || 'Ученик');
-        const senderTitle = isUser ? studentName : SCENARIOS[currentScenarioKey].title;
+        const senderTitle = isUser ? studentName : getEffectiveRoleTitle();
 
         wrap.innerHTML = \`
           \${!isUser ? '<div class="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5 text-xs shadow-2xs font-bold">🤖</div>' : ''}
@@ -964,7 +1008,8 @@ export function getStandaloneHtmlContent(): string {
       rep += '=======================================================\\n\\n';
       rep += 'Ученик: ' + student + '\\n';
       rep += 'Дата и время: ' + now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU') + '\\n';
-      rep += 'Сценарий: ' + sc.title + '\\n';
+      const roleTitle = getEffectiveRoleTitle();
+      rep += 'Сценарий: ' + roleTitle + '\\n';
       rep += 'Цель: ' + sc.goal + '\\n\\n';
       rep += '-------------------------------------------------------\\n';
       rep += 'СИСТЕМНЫЙ ПРОМПТ (ИНСТРУКЦИЯ ДЛЯ ИИ):\\n';
@@ -978,7 +1023,7 @@ export function getStandaloneHtmlContent(): string {
         rep += '[Диалог не проводился]\\n';
       } else {
         messages.forEach((m, idx) => {
-          const sender = m.role === 'user' ? '[' + student + ']' : '[ИИ: ' + sc.title + ']';
+          const sender = m.role === 'user' ? '[' + student + ']' : '[ИИ: ' + roleTitle + ']';
           rep += (idx + 1) + '. ' + sender + ' (' + m.timestamp + '):\\n' + m.content + '\\n\\n';
         });
       }

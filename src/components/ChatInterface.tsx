@@ -20,6 +20,7 @@ interface ChatInterfaceProps {
   onClearChat: () => void;
   selectedScenario: Scenario;
   systemPrompt: string;
+  customBotName?: string;
 }
 
 export function ChatInterface({
@@ -29,6 +30,7 @@ export function ChatInterface({
   onClearChat,
   selectedScenario,
   systemPrompt,
+  customBotName,
 }: ChatInterfaceProps) {
   const [inputText, setInputText] = useState('');
   const [studentName, setStudentName] = useState(() => {
@@ -37,6 +39,11 @@ export function ChatInterface({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const effectiveRoleName =
+    selectedScenario.id === 'custom-scenario' && customBotName?.trim()
+      ? customBotName.trim()
+      : selectedScenario.title;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -72,7 +79,7 @@ export function ChatInterface({
     report += `=======================================================\n\n`;
     report += `Ученик: ${defaultName}\n`;
     report += `Дата и время проведения: ${dateStr} ${timeStr}\n`;
-    report += `Выбранный сценарий: ${selectedScenario.title} (${selectedScenario.category})\n`;
+    report += `Выбранный сценарий: ${effectiveRoleName} (${selectedScenario.category})\n`;
     report += `Цель роли: ${selectedScenario.taskGoal}\n\n`;
     report += `-------------------------------------------------------\n`;
     report += `СИСТЕМНЫЙ ПРОМПТ (ИНСТРУКЦИЯ ДЛЯ НЕЙРОСЕТИ):\n`;
@@ -86,7 +93,7 @@ export function ChatInterface({
       report += `[Тестирование не проводилось / сообщения отсутствуют]\n`;
     } else {
       messages.forEach((m, idx) => {
-        const sender = m.role === 'user' ? `[${defaultName}]` : `[ИИ: ${selectedScenario.title}]`;
+        const sender = m.role === 'user' ? `[${defaultName}]` : `[ИИ: ${effectiveRoleName}]`;
         report += `${idx + 1}. ${sender} (${m.timestamp}):\n${m.content}\n\n`;
       });
     }
@@ -150,7 +157,7 @@ export function ChatInterface({
               </span>
             </div>
             <p className="text-xs text-slate-500 truncate max-w-[240px]">
-              Роль: <span className="text-indigo-600 font-medium">{selectedScenario.title}</span>
+              Роль: <span className="text-indigo-600 font-medium">{effectiveRoleName}</span>
             </p>
           </div>
         </div>
@@ -190,7 +197,7 @@ export function ChatInterface({
               </h3>
               <p className="text-xs text-slate-500 leading-relaxed">
                 Нажмите на один из готовых вопросов ниже или напишите своё сообщение, чтобы
-                проверить, как ИИ справляется с ролью «{selectedScenario.title}».
+                проверить, как ИИ справляется с ролью «{effectiveRoleName}».
               </p>
             </div>
 
@@ -236,7 +243,7 @@ export function ChatInterface({
                 >
                   <div className="flex items-center justify-between gap-3 mb-1 text-[10px] opacity-75">
                     <span className="font-semibold">
-                      {isUser ? studentName.trim() || 'Пользователь' : selectedScenario.title}
+                      {isUser ? studentName.trim() || 'Пользователь' : effectiveRoleName}
                     </span>
                     <span className="font-mono">{m.timestamp}</span>
                   </div>

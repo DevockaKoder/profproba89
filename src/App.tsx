@@ -54,6 +54,21 @@ export default function App() {
   // 3. Scenario state
   const [selectedScenario, setSelectedScenario] = useState<Scenario>(SCENARIOS[0]);
 
+  // Custom bot name for 'custom-scenario'
+  const [customBotName, setCustomBotName] = useState<string>(() => {
+    return localStorage.getItem('prompt_trainer_custom_bot_name') || '';
+  });
+
+  const handleCustomBotNameChange = (name: string) => {
+    setCustomBotName(name);
+    localStorage.setItem('prompt_trainer_custom_bot_name', name);
+  };
+
+  const effectiveRoleName =
+    selectedScenario.id === 'custom-scenario' && customBotName.trim()
+      ? customBotName.trim()
+      : selectedScenario.title;
+
   // 4. System prompt state with per-scenario cache
   const [systemPrompt, setSystemPrompt] = useState<string>(() => {
     const saved = localStorage.getItem(`prompt_trainer_sys_${SCENARIOS[0].id}`);
@@ -109,7 +124,7 @@ export default function App() {
       role: 'user',
       content: text.trim(),
       timestamp: timeStr,
-      scenarioTitle: selectedScenario.title,
+      scenarioTitle: effectiveRoleName,
     };
 
     const updatedMessages = [...messages, userMessage];
@@ -131,7 +146,7 @@ export default function App() {
           hour: '2-digit',
           minute: '2-digit',
         }),
-        scenarioTitle: selectedScenario.title,
+        scenarioTitle: effectiveRoleName,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -144,7 +159,7 @@ export default function App() {
           hour: '2-digit',
           minute: '2-digit',
         }),
-        scenarioTitle: selectedScenario.title,
+        scenarioTitle: effectiveRoleName,
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -191,6 +206,8 @@ export default function App() {
             systemPrompt={systemPrompt}
             onChangePrompt={handleChangePrompt}
             onApplyAndResetChat={handleApplyAndResetChat}
+            customBotName={customBotName}
+            onChangeCustomBotName={handleCustomBotNameChange}
           />
         </div>
 
@@ -203,6 +220,7 @@ export default function App() {
             onClearChat={() => setMessages([])}
             selectedScenario={selectedScenario}
             systemPrompt={systemPrompt}
+            customBotName={customBotName}
           />
         </div>
       </main>

@@ -26,6 +26,8 @@ interface PromptEditorProps {
   systemPrompt: string;
   onChangePrompt: (prompt: string) => void;
   onApplyAndResetChat: () => void;
+  customBotName: string;
+  onChangeCustomBotName: (name: string) => void;
 }
 
 export function PromptEditor({
@@ -34,6 +36,8 @@ export function PromptEditor({
   systemPrompt,
   onChangePrompt,
   onApplyAndResetChat,
+  customBotName,
+  onChangeCustomBotName,
 }: PromptEditorProps) {
   const [copied, setCopied] = useState(false);
   const [appliedNotification, setAppliedNotification] = useState(false);
@@ -124,7 +128,9 @@ export function PromptEditor({
             >
               {SCENARIOS.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.title} ({s.category})
+                  {s.id === 'custom-scenario' && customBotName.trim()
+                    ? `✨ ${customBotName.trim()} (Свой персонаж)`
+                    : `${s.title} (${s.category})`}
                 </option>
               ))}
             </select>
@@ -134,11 +140,46 @@ export function PromptEditor({
           </div>
         </div>
 
+        {/* Custom Bot Name Input when custom scenario is selected */}
+        {selectedScenario.id === 'custom-scenario' && (
+          <div className="mt-3 p-3.5 bg-gradient-to-br from-purple-50 to-indigo-50/60 border border-purple-200 rounded-xl shadow-2xs space-y-2">
+            <div className="flex items-center justify-between">
+              <label
+                htmlFor="input-custom-bot-name"
+                className="text-xs font-bold text-purple-950 flex items-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                <span>Название вашего бота (имя персонажа):</span>
+              </label>
+              {customBotName.trim() && (
+                <span className="text-[10px] font-semibold text-purple-700 bg-purple-100/90 px-2 py-0.5 rounded-full">
+                  Задано
+                </span>
+              )}
+            </div>
+            <input
+              id="input-custom-bot-name"
+              type="text"
+              value={customBotName}
+              onChange={(e) => onChangeCustomBotName(e.target.value)}
+              placeholder="Например: Шеф-повар Марио, Космический пилот..."
+              className="w-full px-3 py-2 text-xs font-semibold bg-white border border-purple-300 rounded-lg text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 shadow-2xs"
+            />
+            <p className="text-[11px] text-purple-700 leading-snug">
+              💡 Это название будет отображаться в заголовке диалога (<span className="font-semibold text-purple-900">«Роль: {customBotName.trim() || 'Свой уникальный персонаж'}»</span>), в сообщениях бота и в итоговом отчёте.
+            </p>
+          </div>
+        )}
+
         {/* Task Objective Banner */}
         <div className="mt-3 p-3 bg-white border border-slate-200 rounded-xl text-xs space-y-1 shadow-2xs">
           <div className="flex items-center gap-1.5 font-bold text-slate-900">
             {renderScenarioIcon(selectedScenario.icon)}
-            <span>Цель профпробы:</span>
+            <span>
+              {selectedScenario.id === 'custom-scenario' && customBotName.trim()
+                ? `Цель роли «${customBotName.trim()}»:`
+                : 'Цель профпробы:'}
+            </span>
           </div>
           <p className="text-slate-600 leading-relaxed text-[11px]">
             {selectedScenario.taskGoal}
