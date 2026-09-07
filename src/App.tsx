@@ -21,9 +21,14 @@ export default function App() {
       const saved = localStorage.getItem('prompt_trainer_api_settings');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // If saved key is empty, fall back to DEFAULT_API_KEY
-        if (!parsed.apiKey && DEFAULT_API_KEY) {
-          parsed.apiKey = DEFAULT_API_KEY;
+        // If default key is configured, synchronize provider and model with DEFAULT_PROVIDER
+        if (DEFAULT_API_KEY) {
+          if (!parsed.apiKey || parsed.apiKey === DEFAULT_API_KEY) {
+            parsed.apiKey = DEFAULT_API_KEY;
+            parsed.provider = DEFAULT_PROVIDER;
+            parsed.model = DEFAULT_MODEL;
+            parsed.baseUrl = DEFAULT_BASE_URL;
+          }
         }
         return parsed;
       }

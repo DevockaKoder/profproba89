@@ -13,13 +13,13 @@
  * ============================================================================
  */
 
-export const DEFAULT_API_KEY = ''; // 👈 ВСТАВЬТЕ ВАШ API-КЛЮЧ В КАВЫЧКИ СЮДА
+export const DEFAULT_API_KEY = 'MDE5YWRmZjItNzE2Ni03ODU5LTk1NTQtOGMyN2Q5Y2ZiZjFiOjBmYWM2NjBlLTdjZWMtNDNkNC1hMzMyLWNkMTZhYmViNTk3MQ=='; // 👈 ВСТАВЬТЕ ВАШ API-КЛЮЧ В КАВЫЧКИ СЮДА
 
-// Адрес API шлюза (по умолчанию OpenRouter, можно заменить на OpenAI, Groq, DeepSeek и др.)
-export const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
+// Адрес API шлюза (для GigaChat)
+export const DEFAULT_BASE_URL = 'https://gigachat.devices.sberbank.ru/api/v1/chat/completions';
 
 // Название модели нейросети
-export const DEFAULT_MODEL = 'gpt-4o-mini';
+export const DEFAULT_MODEL = 'GigaChat';
 
 // Тип провайдера: 'openai' (любой OpenAI-совместимый API) или 'gigachat'
-export const DEFAULT_PROVIDER: 'openai' | 'gigachat' = 'openai';
+export const DEFAULT_PROVIDER: 'openai' | 'gigachat' = 'gigachat';

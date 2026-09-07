@@ -1,5 +1,42 @@
 import { ApiSettings, ChatMessage } from '../types';
 
+function isLikelyGigaChatKey(key: string): boolean {
+  const clean = key.trim();
+  if (clean.startsWith('Basic ') || clean.startsWith('eyJ')) return true;
+  if (clean.length > 50 && clean.endsWith('=')) {
+    try {
+      const decoded = atob(clean);
+      if (decoded.includes(':') && decoded.includes('-')) return true;
+    } catch {
+      // not base64
+    }
+  }
+  return false;
+}
+
+async function safeExtractError(response: Response, defaultMessage = 'Ошибка запроса'): Promise<string> {
+  try {
+    const rawText = await response.text();
+    if (!rawText || !rawText.trim()) {
+      return `${defaultMessage} (${response.status}: ${response.statusText || 'Без описания'})`;
+    }
+    try {
+      const json = JSON.parse(rawText);
+      return (
+        json.error?.message ||
+        json.error ||
+        json.message ||
+        json.error_description ||
+        rawText
+      );
+    } catch {
+      return rawText;
+    }
+  } catch {
+    return `${defaultMessage} (${response.status})`;
+  }
+}
+
 export async function sendChatMessage(
   settings: ApiSettings,
   systemPrompt: string,
@@ -12,7 +49,8 @@ export async function sendChatMessage(
     );
   }
 
-  if (settings.provider === 'gigachat') {
+  // Auto-detect GigaChat key or explicit provider selection
+  if (settings.provider === 'gigachat' || isLikelyGigaChatKey(activeKey)) {
     return fetchGigaChat(settings, systemPrompt, messages);
   }
 
@@ -58,14 +96,8 @@ async function fetchOpenAICompatible(
     });
 
     if (!response.ok) {
-      let errText = '';
-      try {
-        const errJson = await response.json();
-        errText = errJson.error?.message || JSON.stringify(errJson);
-      } catch {
-        errText = await response.text();
-      }
-      throw new Error(`Ошибка API (${response.status}): ${errText || response.statusText}`);
+      const errText = await safeExtractError(response, 'Ошибка API');
+      throw new Error(`Ошибка API (${response.status}): ${errText}`);
     }
 
     const data = await response.json();
@@ -111,14 +143,7 @@ async function fetchGigaChat(
       const data = await proxyResponse.json();
       if (data.reply) return data.reply;
     } else if (proxyResponse.status !== 404) {
-      // Server returned a specific error from GigaChat (e.g. invalid key or bad request)
-      let errText = '';
-      try {
-        const errJson = await proxyResponse.json();
-        errText = errJson.error || errJson.message || JSON.stringify(errJson);
-      } catch {
-        errText = await proxyResponse.text();
-      }
+      const errText = await safeExtractError(proxyResponse, 'Ошибка сервера');
       throw new Error(errText || `Ошибка сервера (${proxyResponse.status})`);
     }
   } catch (proxyError: any) {
@@ -165,13 +190,7 @@ async function fetchGigaChatClientSide(
         });
 
         if (!oauthResponse.ok) {
-          let errText = '';
-          try {
-            const errJson = await oauthResponse.json();
-            errText = errJson.message || JSON.stringify(errJson);
-          } catch {
-            errText = await oauthResponse.text();
-          }
+          const errText = await safeExtractError(oauthResponse, 'Ошибка авторизации GigaChat OAuth');
           throw new Error(`Ошибка авторизации GigaChat OAuth (${oauthResponse.status}): ${errText}`);
         }
 
@@ -228,14 +247,8 @@ async function fetchGigaChatClientSide(
     });
 
     if (!response.ok) {
-      let errText = '';
-      try {
-        const errJson = await response.json();
-        errText = errJson.message || errJson.error?.message || JSON.stringify(errJson);
-      } catch {
-        errText = await response.text();
-      }
-      throw new Error(`Ошибка GigaChat API (${response.status}): ${errText || response.statusText}`);
+      const errText = await safeExtractError(response, 'Ошибка GigaChat API');
+      throw new Error(`Ошибка GigaChat API (${response.status}): ${errText}`);
     }
 
     const data = await response.json();

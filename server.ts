@@ -13,6 +13,21 @@ interface TokenCacheEntry {
 }
 const gigachatTokenCache = new Map<string, TokenCacheEntry>();
 
+async function extractErrorText(response: Response, defaultMsg = 'Ошибка'): Promise<string> {
+  try {
+    const raw = await response.text();
+    if (!raw || !raw.trim()) return `${defaultMsg} (${response.status})`;
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed.message || parsed.error?.message || parsed.error || parsed.error_description || raw;
+    } catch {
+      return raw;
+    }
+  } catch {
+    return `${defaultMsg} (${response.status})`;
+  }
+}
+
 async function getGigaChatAccessToken(apiKey: string, scope = 'GIGACHAT_API_PERS'): Promise<string> {
   const cleanKey = apiKey.trim();
 
@@ -47,13 +62,7 @@ async function getGigaChatAccessToken(apiKey: string, scope = 'GIGACHAT_API_PERS
   });
 
   if (!response.ok) {
-    let errBody = '';
-    try {
-      const errJson = await response.json();
-      errBody = errJson.message || errJson.error_description || JSON.stringify(errJson);
-    } catch {
-      errBody = await response.text();
-    }
+    const errBody = await extractErrorText(response, 'Ошибка авторизации GigaChat');
     throw new Error(
       `Ошибка авторизации GigaChat (OAuth ${response.status}): ${errBody || 'Проверьте Client Secret (Authorization Key)'}`
     );
@@ -124,13 +133,7 @@ async function startServer() {
       });
 
       if (!chatResponse.ok) {
-        let chatErr = '';
-        try {
-          const jsonErr = await chatResponse.json();
-          chatErr = jsonErr.message || jsonErr.error?.message || JSON.stringify(jsonErr);
-        } catch {
-          chatErr = await chatResponse.text();
-        }
+        const chatErr = await extractErrorText(chatResponse, 'Ошибка GigaChat API');
         return res.status(chatResponse.status).json({
           error: `Ошибка GigaChat API (${chatResponse.status}): ${chatErr}`,
         });

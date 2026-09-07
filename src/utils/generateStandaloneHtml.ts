@@ -1,3 +1,10 @@
+import {
+  DEFAULT_API_KEY,
+  DEFAULT_BASE_URL,
+  DEFAULT_MODEL,
+  DEFAULT_PROVIDER,
+} from '../config/apiKeyConfig';
+
 export function getStandaloneHtmlContent(): string {
   return `<!DOCTYPE html>
 <html lang="ru">
@@ -312,10 +319,10 @@ export function getStandaloneHtmlContent(): string {
      * После этого сохраните файл index.html и выложите на GitHub Pages.
      * Все компьютеры в школьном классе сразу будут работать без ввода ключа!
      * ============================================================================ */
-    const DEFAULT_API_KEY = ''; // 👈 ВСТАВЬТЕ СЮДА ВАШ API-КЛЮЧ В КАВЫЧКАХ
-    const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1'; // Шлюз API (OpenRouter, Groq, OpenAI)
-    const DEFAULT_MODEL = 'gpt-4o-mini'; // Имя модели нейросети
-    const DEFAULT_PROVIDER = 'openai'; // 'openai' или 'gigachat'
+    const DEFAULT_API_KEY = '${DEFAULT_API_KEY}'; // 👈 ВСТАВЬТЕ СЮДА ВАШ API-КЛЮЧ В КАВЫЧКАХ
+    const DEFAULT_BASE_URL = '${DEFAULT_BASE_URL}'; // Шлюз API
+    const DEFAULT_MODEL = '${DEFAULT_MODEL}'; // Имя модели нейросети
+    const DEFAULT_PROVIDER = '${DEFAULT_PROVIDER}'; // 'openai' или 'gigachat'
     // ============================================================================
 
     // --- 1. Scenarios Data ---
@@ -702,21 +709,48 @@ export function getStandaloneHtmlContent(): string {
       renderMessages();
     });
 
+    function isLikelyGigaChatKey(k) {
+      const clean = (k || '').trim();
+      if (clean.startsWith('Basic ') || clean.startsWith('eyJ')) return true;
+      if (clean.length > 50 && clean.endsWith('=')) {
+        try {
+          const dec = atob(clean);
+          if (dec.includes(':') && dec.includes('-')) return true;
+        } catch (_) {}
+      }
+      return false;
+    }
+
     // --- 7. AI Fetch Engine ---
     async function generateAIResponse(sysPrompt, allMessages) {
       if (!apiConfig.apiKey || !apiConfig.apiKey.trim()) {
         throw new Error('API-ключ не указан. Вставьте ключ в константу DEFAULT_API_KEY в коде файла index.html или укажите его через кнопку «🔑 Ключ API» вверху страницы.');
       }
 
-      if (apiConfig.provider === 'gigachat') {
+      if (apiConfig.provider === 'gigachat' || isLikelyGigaChatKey(apiConfig.apiKey)) {
         return fetchGigaChatDirect(sysPrompt, allMessages);
       }
 
       return fetchOpenAIDirect(sysPrompt, allMessages);
     }
 
+    async function safeExtractErr(res, defaultMsg) {
+      try {
+        const raw = await res.text();
+        if (!raw) return defaultMsg + ' (' + res.status + ')';
+        try {
+          const parsed = JSON.parse(raw);
+          return parsed.error?.message || parsed.message || parsed.error || parsed.error_description || raw;
+        } catch {
+          return raw;
+        }
+      } catch {
+        return defaultMsg + ' (' + res.status + ')';
+      }
+    }
+
     async function fetchOpenAIDirect(sysPrompt, allMessages) {
-      const url = (apiConfig.baseUrl.trim().replace(/\\/+$/, '')) + '/chat/completions';
+      const url = (apiConfig.baseUrl.trim().replace(/\/+$/, '')) + '/chat/completions';
       const payload = {
         model: apiConfig.model.trim() || 'gpt-4o-mini',
         messages: [
@@ -736,14 +770,8 @@ export function getStandaloneHtmlContent(): string {
       });
 
       if (!res.ok) {
-        let errText = '';
-        try {
-          const errJson = await res.json();
-          errText = errJson.error?.message || JSON.stringify(errJson);
-        } catch {
-          errText = await res.text();
-        }
-        throw new Error('Ошибка API (' + res.status + '): ' + (errText || res.statusText));
+        const errText = await safeExtractErr(res, 'Ошибка API');
+        throw new Error('Ошибка API (' + res.status + '): ' + errText);
       }
       const data = await res.json();
       const reply = data.choices?.[0]?.message?.content;
@@ -778,13 +806,7 @@ export function getStandaloneHtmlContent(): string {
         });
 
         if (!oauthRes.ok) {
-          let errText = '';
-          try {
-            const errJson = await oauthRes.json();
-            errText = errJson.message || JSON.stringify(errJson);
-          } catch {
-            errText = await oauthRes.text();
-          }
+          const errText = await safeExtractErr(oauthRes, 'Ошибка OAuth Сбера');
           throw new Error('Ошибка OAuth Сбера (' + oauthRes.status + '): ' + errText);
         }
 
@@ -809,7 +831,32 @@ export function getStandaloneHtmlContent(): string {
     }
 
     async function fetchGigaChatDirect(sysPrompt, allMessages) {
-      // 1. Obtain OAuth token from GigaChat Client Secret
+      // 1. Попытка через локальный сервер-прокси /api/gigachat (если доступен на этом сервере)
+      try {
+        const proxyRes = await fetch('/api/gigachat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            apiKey: apiConfig.apiKey.trim(),
+            systemPrompt: sysPrompt,
+            messages: allMessages,
+            model: apiConfig.model.trim() || 'GigaChat'
+          })
+        });
+        if (proxyRes.ok) {
+          const pData = await proxyRes.json();
+          if (pData.reply) return pData.reply;
+        } else if (proxyRes.status !== 404) {
+          const pErr = await safeExtractErr(proxyRes, 'Ошибка GigaChat API');
+          throw new Error(pErr);
+        }
+      } catch (proxyErr) {
+        if (proxyErr.message && !proxyErr.message.includes('404') && !proxyErr.message.includes('fetch') && !proxyErr.message.includes('NetworkError')) {
+          throw proxyErr;
+        }
+      }
+
+      // 2. Прямое обращение (OAuth + API)
       const token = await getGigaChatAccessToken(apiConfig.apiKey.trim());
 
       const url = apiConfig.baseUrl.trim() || 'https://gigachat.devices.sberbank.ru/api/v1/chat/completions';
@@ -834,14 +881,8 @@ export function getStandaloneHtmlContent(): string {
         });
 
         if (!res.ok) {
-          let errText = '';
-          try {
-            const errJson = await res.json();
-            errText = errJson.message || errJson.error?.message || JSON.stringify(errJson);
-          } catch {
-            errText = await res.text();
-          }
-          throw new Error('GigaChat error (' + res.status + '): ' + (errText || res.statusText));
+          const errText = await safeExtractErr(res, 'GigaChat error');
+          throw new Error('GigaChat error (' + res.status + '): ' + errText);
         }
         const data = await res.json();
         const reply = data.choices?.[0]?.message?.content;
