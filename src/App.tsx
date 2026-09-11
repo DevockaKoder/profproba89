@@ -6,7 +6,6 @@ import { ApiConfigModal } from './components/ApiConfigModal';
 import { SCENARIOS } from './data/scenarios';
 import { Scenario, ChatMessage, ApiSettings } from './types';
 import { sendChatMessage } from './services/aiService';
-import { getStandaloneHtmlContent } from './utils/generateStandaloneHtml';
 import {
   DEFAULT_API_KEY,
   DEFAULT_BASE_URL,
@@ -173,27 +172,12 @@ export default function App() {
     localStorage.setItem('prompt_trainer_api_settings', JSON.stringify(newSettings));
   };
 
-  // Handle Downloading standalone index.html
-  const handleDownloadStandaloneHtml = () => {
-    const htmlContent = getStandaloneHtmlContent();
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'index.html';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
-      {/* Header with timer, title, action buttons */}
+      {/* Header with title and API key status */}
       <Header
         apiSettings={apiSettings}
         onOpenApiConfig={() => setIsApiModalOpen(true)}
-        onDownloadStandalone={handleDownloadStandaloneHtml}
       />
 
       {/* Main Two-Column Workspace */}

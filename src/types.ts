@@ -16,6 +16,12 @@ export interface ChatMessage {
   scenarioTitle?: string;
 }
 
+export interface TestQuestion {
+  task: string;
+  hint: string;
+  sampleQuery: string;
+}
+
 export interface Scenario {
   id: string;
   title: string;
@@ -24,7 +30,7 @@ export interface Scenario {
   description: string;
   taskGoal: string;
   suggestedPrompts: string[];
-  testQuestions: string[];
+  testQuestions: (TestQuestion | string)[];
   systemPrompt: string;
 }
 
